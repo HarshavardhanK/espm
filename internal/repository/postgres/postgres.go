@@ -58,12 +58,14 @@ func (s *PostgresStore) AppendEvents(ctx context.Context, events []repository.Ev
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
 
-		_, err = tx.ExecContext(ctx, `
+		query := `
 			INSERT INTO events (
 				event_id, aggregate_type, aggregate_id, event_type,
 				event_version, sequence_number, data, metadata, created_at
 			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		`, event.ID, event.AggregateType, event.AggregateID, event.EventType,
+		`
+
+		_, err = tx.ExecContext(ctx, query, event.ID, event.AggregateType, event.AggregateID, event.EventType,
 			event.Version, event.Sequence, event.Data, metadata, event.CreatedAt)
 
 		if err != nil {
@@ -76,13 +78,15 @@ func (s *PostgresStore) AppendEvents(ctx context.Context, events []repository.Ev
 
 // GetEventsByAggregateID implements the EventStore interface
 func (s *PostgresStore) GetEventsByAggregateID(ctx context.Context, aggregateType, aggregateID string) ([]repository.Event, error) {
-	rows, err := s.db.QueryContext(ctx, `
+
+	query := `
 		SELECT event_id, aggregate_type, aggregate_id, event_type,
 			   event_version, sequence_number, data, metadata, created_at
 		FROM events
 		WHERE aggregate_type = $1 AND aggregate_id = $2
 		ORDER BY sequence_number ASC
-	`, aggregateType, aggregateID)
+	`
+	rows, err := s.db.QueryContext(ctx, query, aggregateType, aggregateID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query events: %w", err)
@@ -100,6 +104,7 @@ func (s *PostgresStore) GetEventsByAggregateID(ctx context.Context, aggregateTyp
 			&event.ID, &event.AggregateType, &event.AggregateID, &event.EventType,
 			&event.Version, &event.Sequence, &event.Data, &metadata, &event.CreatedAt,
 		)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
 		}

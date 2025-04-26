@@ -5,32 +5,25 @@ import (
 	"errors"
 )
 
-// Cache errors
+// Common cache errors
 var (
 	ErrCacheMiss  = errors.New("cache miss")
 	ErrInvalidKey = errors.New("invalid cache key")
 )
 
-// RedisCache defines the interface for Redis caching operations
+// Redis cache operations
 type RedisCache interface {
-	// Get retrieves a value from cache
+
+	// Basic cache operations
 	Get(ctx context.Context, key string) ([]byte, error)
-
-	// Set stores a value in cache
 	Set(ctx context.Context, key string, value []byte) error
-
-	// Delete removes a value from cache
 	Delete(ctx context.Context, key string) error
 
-	// GetEventStream retrieves an event stream from cache
+	// Event stream specific operations
 	GetEventStream(ctx context.Context, aggregateType, aggregateID string) ([]byte, error)
-
-	// SetEventStream stores an event stream in cache
 	SetEventStream(ctx context.Context, aggregateType, aggregateID string, value []byte) error
 
-	// HealthCheck verifies Redis connection
+	// Health and maintenance
 	HealthCheck(ctx context.Context) error
-
-	// Close closes the Redis connection
 	Close() error
 }

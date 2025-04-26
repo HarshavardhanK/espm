@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// RedisConfig holds Redis connection and cache settings
+// Redis connection and cache settings
 type RedisConfig struct {
 	Host         string
 	Port         int
@@ -19,7 +19,7 @@ type RedisConfig struct {
 	TTL          time.Duration
 }
 
-// DefaultRedisConfig returns default Redis configuration
+// Default Redis settings for local development
 func DefaultRedisConfig() RedisConfig {
 	return RedisConfig{
 		Host:         "localhost",
