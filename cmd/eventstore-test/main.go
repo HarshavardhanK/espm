@@ -7,9 +7,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/HarshavardhanK/espm/internal/repository"
+	"github.com/HarshavardhanK/espm/internal/repository/postgres"
 	"github.com/google/uuid"
-	"github.com/yourusername/espm/internal/repository"
-	"github.com/yourusername/espm/internal/repository/postgres"
 )
 
 func main() {
