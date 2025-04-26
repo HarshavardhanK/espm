@@ -14,6 +14,13 @@ const (
 	StatusCancelled Status = "CANCELLED"
 )
 
+type OrderItem struct {
+	// OrderItem represents an item in the order
+	ProductID uuid.UUID
+	Quantity  int
+	UnitPrice float64
+}
+
 // Order represents the order aggregate root
 type Order struct {
 	ID         uuid.UUID
@@ -28,13 +35,6 @@ type Order struct {
 	UpdatedAt time.Time
 
 	Version int
-}
-
-type OrderItem struct {
-	// OrderItem represents an item in the order
-	ProductID uuid.UUID
-	Quantity  int
-	UnitPrice float64
 }
 
 func NewOrder(customerID uuid.UUID) *Order {
