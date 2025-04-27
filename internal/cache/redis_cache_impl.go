@@ -19,19 +19,25 @@ type redisCache struct {
 // Creates a new Redis client with the given config
 func NewRedisCache(cfg config.RedisConfig) (RedisCache, error) {
 
+	// Enhanced connection pooling configuration
+
 	client := redis.NewClient(&redis.Options{
 
 		Addr: fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 
-		Password:     cfg.Password,
-		DB:           cfg.DB,
+		Password: cfg.Password,
+		DB:       cfg.DB,
+
 		PoolSize:     cfg.PoolSize,
 		MinIdleConns: cfg.MinIdleConns,
+
+		MaxIdleConns: cfg.PoolSize, // Match pool size for optimal performance
 		DialTimeout:  cfg.DialTimeout,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 
-		MaxRetries: cfg.MaxRetries,
+		MaxRetries:  cfg.MaxRetries,
+		PoolTimeout: time.Second * 30, // Increased pool timeout for high concurrency
 	})
 
 	// Quick ping to verify connection
@@ -40,7 +46,6 @@ func NewRedisCache(cfg config.RedisConfig) (RedisCache, error) {
 	}
 
 	return &redisCache{
-
 		client: client,
 		ttl:    cfg.TTL,
 	}, nil
@@ -78,7 +83,72 @@ func (r *redisCache) Set(ctx context.Context, key string, value []byte) error {
 	return nil
 }
 
+// BatchSet stores multiple key-value pairs in Redis
+func (r *redisCache) BatchSet(ctx context.Context, pairs map[string][]byte) error {
+	if len(pairs) == 0 {
+		return nil
+	}
+
+	pipe := r.client.Pipeline()
+	for key, value := range pairs {
+		if key == "" {
+			continue
+		}
+		pipe.Set(ctx, key, value, r.ttl)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to batch set cache: %w", err)
+	}
+
+	return nil
+}
+
+// BatchGet retrieves multiple values from Redis
+func (r *redisCache) BatchGet(ctx context.Context, keys []string) (map[string][]byte, error) {
+	if len(keys) == 0 {
+		return make(map[string][]byte), nil
+	}
+
+	pipe := r.client.Pipeline()
+	cmds := make(map[string]*redis.StringCmd)
+
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		cmds[key] = pipe.Get(ctx, key)
+	}
+
+	_, err := pipe.Exec(ctx)
+
+	if err != nil && err != redis.Nil {
+		return nil, fmt.Errorf("failed to batch get from cache: %w", err)
+	}
+
+	result := make(map[string][]byte)
+
+	for key, cmd := range cmds {
+
+		val, err := cmd.Bytes()
+
+		if err == redis.Nil {
+			continue
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get value for key %s: %w", key, err)
+		}
+
+		result[key] = val
+	}
+
+	return result, nil
+}
+
 func (r *redisCache) Delete(ctx context.Context, key string) error {
+
 	if key == "" {
 		return ErrInvalidKey
 	}
@@ -90,8 +160,36 @@ func (r *redisCache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+// BatchDelete removes multiple keys from Redis
+func (r *redisCache) BatchDelete(ctx context.Context, keys []string) error {
+
+	if len(keys) == 0 {
+		return nil
+	}
+
+	pipe := r.client.Pipeline()
+
+	for _, key := range keys {
+
+		if key == "" {
+			continue
+		}
+
+		pipe.Del(ctx, key)
+	}
+
+	_, err := pipe.Exec(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to batch delete from cache: %w", err)
+	}
+
+	return nil
+}
+
 // Get event stream for an aggregate
 func (r *redisCache) GetEventStream(ctx context.Context, aggregateType, aggregateID string) ([]byte, error) {
+
 	if aggregateType == "" || aggregateID == "" {
 		return nil, ErrInvalidKey
 	}
@@ -103,6 +201,7 @@ func (r *redisCache) GetEventStream(ctx context.Context, aggregateType, aggregat
 
 // Store event stream for an aggregate
 func (r *redisCache) SetEventStream(ctx context.Context, aggregateType, aggregateID string, value []byte) error {
+
 	if aggregateType == "" || aggregateID == "" {
 		return ErrInvalidKey
 	}
@@ -112,13 +211,32 @@ func (r *redisCache) SetEventStream(ctx context.Context, aggregateType, aggregat
 	return r.Set(ctx, key, value)
 }
 
+// BatchSetEventStreams stores multiple event streams
+func (r *redisCache) BatchSetEventStreams(ctx context.Context, streams map[string]map[string][]byte) error {
+
+	if len(streams) == 0 {
+		return nil
+	}
+
+	pairs := make(map[string][]byte)
+
+	for aggregateType, typeStreams := range streams {
+
+		for aggregateID, value := range typeStreams {
+			key := fmt.Sprintf("events:%s:%s", aggregateType, aggregateID)
+			pairs[key] = value
+		}
+	}
+
+	return r.BatchSet(ctx, pairs)
+}
+
 // Check if Redis is responding
 func (r *redisCache) HealthCheck(ctx context.Context) error {
 
 	if err := r.client.Ping(ctx).Err(); err != nil {
 		return fmt.Errorf("Redis health check failed: %w", err)
 	}
-
 	return nil
 }
 

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: command-api
+  labels:
+    app: espm
+    component: command-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: espm
+      component: command-api
+  template:
+    metadata:
+      labels:
+        app: espm
+        component: command-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        opentelemetry.io/scrape: "true"
+    spec:
+      containers:
+      - name: command-api
+        image: espm/command-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: espm-config
+              key: postgres.host
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: espm-config
+              key: redis.host
+        - name: OTEL_SERVICE_NAME
+          value: "command-api"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://opentelemetry-collector.monitoring.svc.cluster.local:4317"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5 

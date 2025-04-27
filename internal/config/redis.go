@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Redis connection and cache settings
+// RedisConfig holds Redis connection settings
 type RedisConfig struct {
 	Host         string
 	Port         int
@@ -12,26 +12,26 @@ type RedisConfig struct {
 	DB           int
 	PoolSize     int
 	MinIdleConns int
-	MaxRetries   int
 	DialTimeout  time.Duration
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
+	MaxRetries   int
 	TTL          time.Duration
 }
 
-// Default Redis settings for local development
+// DefaultRedisConfig returns default Redis configuration
 func DefaultRedisConfig() RedisConfig {
 	return RedisConfig{
 		Host:         "localhost",
 		Port:         6379,
 		Password:     "",
 		DB:           0,
-		PoolSize:     10,
-		MinIdleConns: 5,
+		PoolSize:     10, // Increased from default
+		MinIdleConns: 5,  // Keep some connections ready
+		DialTimeout:  time.Second * 5,
+		ReadTimeout:  time.Second * 3,
+		WriteTimeout: time.Second * 3,
 		MaxRetries:   3,
-		DialTimeout:  5 * time.Second,
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
-		TTL:          5 * time.Minute,
+		TTL:          time.Hour * 24,
 	}
 }
